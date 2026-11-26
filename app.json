@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "GanApp",
+    "slug": "ganapp",
+    "scheme": "ganapp",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F9FBFA",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ganapp.app"
+    },
+    "android": {
+      "package": "com.ganapp.app",
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "GanApp uses your camera to take a live photo of the spot you are pinging. Gallery uploads are not allowed.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "GanApp uses your location to show what is happening near you and to place your pings on the map."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
