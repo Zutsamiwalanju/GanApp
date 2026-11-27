@@ -1,17 +1,20 @@
-import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import { Badge, Body, Button, Card, Empty, Eyebrow, H1, H2, IconButton, Photo, Screen, Spacer, Stat } from '../../src/components/ui';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { Alert, Pressable, View } from 'react-native';
+import { Text } from '../../src/components/Text';
+import { Badge, Body, Button, Card, Empty, Eyebrow, H1, H2, IconButton, Logo, Photo, Screen, Spacer, Stat, StatusBadge } from '../../src/components/ui';
 import { useApp } from '../../src/store';
 import { C } from '../../src/theme';
 import { fmtAgo, fmtLeft, fmtWhen } from '../../src/time';
 
 export default function PromoterDashboard() {
-  const { pings, uid, profile, now, reload, resetDraft } = useApp();
+  const router = useRouter();
+  const { pings, uid, profile, now, reload, resetDraft, addPracticePing } = useApp();
+  const [busy, setBusy] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      reload();
+      reload().catch(() => {});
     }, [reload]),
   );
 
@@ -20,12 +23,22 @@ export default function PromoterDashboard() {
   const earlier = mine.filter((p) => !p.live);
   const total = (k: 'views' | 'directions' | 'going') => live.reduce((a, p) => a + p[k], 0);
 
+  const practice = async () => {
+    setBusy(true);
+    try {
+      const id = await addPracticePing();
+      router.push(`/promoter/live/${id}`);
+    } catch (e: any) {
+      Alert.alert('Couldn’t create it', e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Screen>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: C.white, fontWeight: '700' }}>{profile.displayName.slice(0, 2).toUpperCase()}</Text>
-        </View>
+        <Logo size={28} />
         <IconButton name="person-circle-outline" label="Profile" onPress={() => router.push('/profile')} />
       </View>
       <Spacer h={18} />
@@ -43,21 +56,27 @@ export default function PromoterDashboard() {
       <H2>Live now</H2>
       <Spacer h={10} />
       {live.length === 0 ? (
-        <Empty icon="megaphone-outline" title="No live pings" body="Create a promoted ping to show up on explorers’ maps." />
+        <Empty
+          title="No live pings yet"
+          body="Create a promoted ping, or try a practice one first. Only you can see the practice ping."
+          action={<Button title="Try a practice ping" variant="outline" icon="school-outline" loading={busy} onPress={practice} />}
+        />
       ) : (
         live.map((p) => (
           <Card key={p.id} style={{ marginBottom: 12 }} onPress={() => router.push(`/promoter/live/${p.id}`)}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Photo ping={p} style={{ width: 64, height: 64 }} rounded={14} />
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ fontWeight: '700', fontSize: 16, color: C.dark }}>{p.title}</Text>
-                <Text style={{ color: C.muted, fontSize: 13 }}>
+                <Text style={{ fontWeight: '700', fontSize: 16, color: C.dark }} numberOfLines={1}>
+                  {p.title}
+                </Text>
+                <Text style={{ color: C.muted, fontSize: 13 }} numberOfLines={1}>
                   {p.category} · {fmtWhen(p.startsAt, p.endsAt, now)}
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                  <Badge text="● LIVE" tone="live" />
-                  <Badge text={`⏱ Ends in ${fmtLeft(p.pingEndsAt, now)}`} />
-                  {p.isPromoted ? <Badge text="PROMOTED" tone="gold" /> : null}
+                  <StatusBadge ping={p} now={now} />
+                  <Badge text={`⏱ Ping ends in ${fmtLeft(p.pingEndsAt, now)}`} />
+                  {p.isPrivate ? <Badge text="PRACTICE" tone="grey" /> : p.isPromoted ? <Badge text="PROMOTED" tone="gold" /> : null}
                 </View>
               </View>
             </View>
@@ -78,10 +97,10 @@ export default function PromoterDashboard() {
               <View style={{ flex: 1 }}>
                 <Text style={{ fontWeight: '700', color: C.dark }}>{p.title}</Text>
                 <Text style={{ color: C.muted, fontSize: 12 }}>
-                  Expired {fmtAgo(p.pingEndsAt, now).toLowerCase()} · {p.views} reached
+                  Ended {fmtAgo(p.pingEndsAt, now).toLowerCase()} · {p.views} reached
                 </Text>
               </View>
-              <Badge text="Expired" tone="grey" />
+              <Badge text="Ended" tone="grey" />
             </Card>
           ))}
         </>

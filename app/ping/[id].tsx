@@ -1,43 +1,48 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, Share, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as api from '../../src/api';
-import { Badge, Body, Button, Card, Empty, H2, Photo, s, Spacer } from '../../src/components/ui';
+import { SafetyMenu } from '../../src/components/Safety';
+import { Text } from '../../src/components/Text';
+import { Badge, Body, Button, Card, CategoryIcon, Empty, Footer, H2, Photo, s, Spacer, StatusBadge } from '../../src/components/ui';
 import { directionsUrl, fmtDistance, walkMinutes } from '../../src/geo';
 import { useApp } from '../../src/store';
 import { C } from '../../src/theme';
-import { ageDays, fmtAgo, fmtLeft, fmtWhen } from '../../src/time';
+import { ageDays, fmtAgo, fmtHours, fmtLeft, fmtWhen } from '../../src/time';
 import type { Review } from '../../src/types';
 
 type Tab = 'about' | 'reviews' | 'going';
 
 export default function PingDetail() {
+  const router = useRouter();
   const { id, tab: initialTab } = useLocalSearchParams<{ id: string; tab?: Tab }>();
-  const { getPing, now, savedIds, goingIds, toggleSave, toggleGoing, uid } = useApp();
+  const { getPing, now, savedIds, goingIds, toggleSave, toggleGoing, uid, blockedIds, hiddenIds } = useApp();
   const ping = getPing(id);
   const [tab, setTab] = useState<Tab>(initialTab ?? 'about');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [myVotes, setMyVotes] = useState<Set<string>>(new Set());
   const [loadingReviews, setLoadingReviews] = useState(true);
+  const [menu, setMenu] = useState<{ target: 'ping' | 'review'; id: string; authorId: string | null; authorName: string } | null>(null);
 
   useEffect(() => {
     if (id) api.bumpStat(id, 'views');
   }, [id]);
 
   const loadReviews = useCallback(async () => {
-    if (!id) return;
+    if (!ping) return;
     try {
-      const [r, v] = await Promise.all([api.fetchReviews(id), api.fetchMyVotes(uid)]);
+      const [r, v] = await Promise.all([api.fetchPlaceReviews(ping.placeKey, ping.id), api.fetchMyVotes(uid)]);
       setReviews(r);
       setMyVotes(new Set(v));
+    } catch {
+      /* keep what we have */
     } finally {
       setLoadingReviews(false);
     }
-  }, [id, uid]);
+  }, [ping?.placeKey, ping?.id, uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reload reviews whenever we come back (e.g. after writing one).
   useFocusEffect(
     useCallback(() => {
       loadReviews();
@@ -47,36 +52,40 @@ export default function PingDetail() {
   if (!ping) {
     return (
       <SafeAreaView style={[s.safe, s.pad]}>
-        <Empty title="This ping is gone" body="It may have expired or been removed." action={<Button title="Back to Explore" onPress={() => router.replace('/(tabs)')} />} />
+        <Empty title="This ping is gone" body="It may have ended, been removed, or hidden after reports." action={<Button title="Back to Explore" onPress={() => router.replace('/(tabs)')} />} />
       </SafeAreaView>
     );
   }
 
-  const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : 0;
+  const visibleReviews = reviews.filter((r) => !hiddenIds.has(r.id) && !(r.authorId && blockedIds.has(r.authorId)));
+  const avg = visibleReviews.length ? visibleReviews.reduce((a, r) => a + r.rating, 0) / visibleReviews.length : 0;
   const isGoing = goingIds.has(ping.id);
   const isSaved = savedIds.has(ping.id);
   const isMine = ping.creatorId === uid;
+  const myReview = reviews.find((r) => r.authorId === uid);
 
   const vote = async (r: Review) => {
+    if (r.authorId === uid) return Alert.alert('That’s your review', 'Other people decide if it’s helpful.');
     const on = !myVotes.has(r.id);
-    setMyVotes((v) => {
-      const n = new Set(v);
-      on ? n.add(r.id) : n.delete(r.id);
-      return n;
-    });
-    setReviews((rs) => rs.map((x) => (x.id === r.id ? { ...x, upvotes: Math.max(0, x.upvotes + (on ? 1 : -1)) } : x)));
+    const apply = (value: boolean) => {
+      setMyVotes((v) => {
+        const n = new Set(v);
+        value ? n.add(r.id) : n.delete(r.id);
+        return n;
+      });
+      setReviews((rs) => rs.map((x) => (x.id === r.id ? { ...x, upvotes: Math.max(0, x.upvotes + (value ? 1 : -1)) } : x)));
+    };
+    apply(on);
     try {
       await api.setVote(uid, r.id, on);
     } catch (e: any) {
-      Alert.alert('Vote failed', e.message);
-      loadReviews();
+      apply(!on);
+      Alert.alert('Vote didn’t go through', e.message);
     }
   };
 
   const share = () =>
-    Share.share({
-      message: `${ping.title} — ${fmtWhen(ping.startsAt, ping.endsAt, now)} at ${ping.placeName || ping.address}. Found on GanApp.`,
-    });
+    Share.share({ message: `${ping.title} — ${fmtWhen(ping.startsAt, ping.endsAt, now)} at ${ping.placeName || ping.address}. Found on GanApp.` });
 
   const directions = () => {
     api.bumpStat(ping.id, 'directions');
@@ -87,41 +96,56 @@ export default function PingDetail() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
         <View>
-          <Photo ping={ping} style={{ width: '100%', height: 280 }} rounded={0} />
+          <Photo ping={ping} style={{ width: '100%', height: 290 }} rounded={0} />
           <View style={{ position: 'absolute', top: 16, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between' }}>
             <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} style={s.round} accessibilityLabel="Back">
               <Ionicons name="arrow-back" size={20} color={C.dark} />
             </Pressable>
-            <Pressable onPress={() => toggleSave(ping.id)} style={s.round} accessibilityLabel={isSaved ? 'Unsave' : 'Save'}>
-              <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={20} color={C.primary} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Pressable onPress={() => toggleSave(ping.id)} style={s.round} accessibilityLabel={isSaved ? 'Unsave' : 'Save'}>
+                <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={20} color={C.primary} />
+              </Pressable>
+              {!isMine ? (
+                <Pressable onPress={() => setMenu({ target: 'ping', id: ping.id, authorId: ping.creatorId, authorName: ping.creatorName })} style={s.round} accessibilityLabel="More options">
+                  <Ionicons name="ellipsis-horizontal" size={20} color={C.dark} />
+                </Pressable>
+              ) : null}
+            </View>
           </View>
-          <View style={{ position: 'absolute', bottom: 14, left: 16, flexDirection: 'row', gap: 6 }}>
-            {ping.live ? <Badge text="● LIVE" tone="live" /> : <Badge text="Expired" tone="grey" />}
-            {ping.live ? <Badge text={`⏱ PING ENDS IN ${fmtLeft(ping.pingEndsAt, now).toUpperCase()}`} /> : null}
+          <View style={{ position: 'absolute', bottom: 14, left: 16, right: 16, flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+            <StatusBadge ping={ping} now={now} />
             {ping.isPromoted ? <Badge text="PROMOTED" tone="gold" /> : null}
+            {ping.isPrivate ? <Badge text="PRACTICE · ONLY YOU" tone="grey" /> : null}
           </View>
         </View>
 
         <View style={{ padding: 24 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: C.primary, letterSpacing: 0.6 }}>
-            {ping.category.toUpperCase()}  /  {ping.kind === 'place' ? 'PLACE' : 'EVENT'}
-          </Text>
-          <Text style={{ fontSize: 28, fontWeight: '700', color: C.dark, marginTop: 4 }}>{ping.title}</Text>
+          <View style={[s.row, { gap: 8 }]}>
+            <CategoryIcon category={ping.category} size={22} />
+            <Text style={{ fontSize: 11, fontWeight: '700', color: C.primary, letterSpacing: 0.6 }}>
+              {ping.category.toUpperCase()}  /  {ping.kind === 'place' ? 'PLACE' : 'EVENT'}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 28, fontWeight: '700', color: C.dark, marginTop: 6, letterSpacing: -0.5 }}>{ping.title}</Text>
           <Body style={{ marginTop: 4 }}>
             {fmtDistance(ping.distance)} away · {ping.placeName || ping.address}
           </Body>
           <Text style={{ color: C.dark, fontWeight: '600', marginTop: 8 }}>
-            {fmtWhen(ping.startsAt, ping.endsAt, now)}  ·  {ping.priceLabel}
+            {ping.kind === 'place' ? fmtHours(ping) : fmtWhen(ping.startsAt, ping.endsAt, now)}  ·  {ping.priceLabel}
           </Text>
           <View style={[s.row, { marginTop: 8, gap: 10 }]}>
-            <Text style={{ color: C.dark, fontWeight: '600' }}>{reviews.length ? `★ ${avg.toFixed(1)}  (${reviews.length} reviews)` : 'No reviews yet'}</Text>
+            <Text style={{ color: C.dark, fontWeight: '600' }}>{visibleReviews.length ? `★ ${avg.toFixed(1)}  (${visibleReviews.length} review${visibleReviews.length > 1 ? 's' : ''})` : 'No reviews yet'}</Text>
             {ping.going >= 20 ? <Text style={{ color: C.primary, fontWeight: '600' }}>Trending ↗</Text> : null}
           </View>
-          <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>Pinned by {ping.creatorName} · live photo</Text>
+          <Text style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>
+            Pinned by {ping.creatorName} · {ping.live ? `ping disappears in ${fmtLeft(ping.pingEndsAt, now)}` : 'ping ended'}
+          </Text>
 
           {isMine ? (
-            <Button title="Manage your ping" icon="stats-chart" variant="outline" style={{ marginTop: 14 }} onPress={() => router.push(`/promoter/live/${ping.id}`)} />
+            <View style={[s.row, { gap: 10, marginTop: 14 }]}>
+              <Button title="Edit" icon="create-outline" variant="outline" style={{ flex: 1 }} onPress={() => router.push(`/ping/edit/${ping.id}`)} />
+              <Button title="Insights" icon="stats-chart" variant="outline" style={{ flex: 1 }} onPress={() => router.push(`/promoter/live/${ping.id}`)} />
+            </View>
           ) : null}
 
           <View style={[s.row, { marginTop: 18, backgroundColor: C.white, borderRadius: 14, borderWidth: 1, borderColor: C.line, padding: 4 }]}>
@@ -161,16 +185,29 @@ export default function PingDetail() {
           {tab === 'reviews' && (
             <View>
               <H2>Loved by the locals?</H2>
-              <Body style={{ marginBottom: 12 }}>Reviews disappear after 30 days unless {api.KEEP_VOTES}+ people vote them helpful.</Body>
+              <Body style={{ marginBottom: 12 }}>
+                Reviews for {ping.placeName || 'this place'}. They disappear after 30 days unless {api.KEEP_VOTES}+ people vote them helpful.
+              </Body>
               {loadingReviews ? <Body>Loading…</Body> : null}
-              {!loadingReviews && reviews.length === 0 ? <Empty icon="star-outline" title="No reviews yet" body="Been here? Be the first." /> : null}
-              {reviews.map((r) => (
+              {!loadingReviews && visibleReviews.length === 0 ? <Empty title="No reviews yet" body="Been here? Be the first." /> : null}
+              {visibleReviews.map((r) => (
                 <Card key={r.id} style={{ marginBottom: 12 }}>
-                  <Text style={{ color: C.goldText }}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</Text>
+                  <View style={[s.row, { justifyContent: 'space-between' }]}>
+                    <Text style={{ color: '#F5A524', fontSize: 15 }}>
+                      {'★'.repeat(r.rating)}
+                      <Text style={{ color: C.line }}>{'★'.repeat(5 - r.rating)}</Text>
+                    </Text>
+                    {r.authorId !== uid ? (
+                      <Pressable onPress={() => setMenu({ target: 'review', id: r.id, authorId: r.authorId, authorName: r.authorName })} hitSlop={10} accessibilityLabel="Review options">
+                        <Ionicons name="ellipsis-horizontal" size={18} color={C.muted} />
+                      </Pressable>
+                    ) : null}
+                  </View>
                   {r.title ? <Text style={{ fontWeight: '700', color: C.dark, fontSize: 16, marginTop: 4 }}>“{r.title}”</Text> : null}
                   {r.body ? <Body style={{ marginTop: 4 }}>{r.body}</Body> : null}
                   <Text style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
-                    {r.authorName} · {fmtAgo(r.createdAt, now)}
+                    {r.authorName}
+                    {r.authorId === uid ? ' (you)' : ''} · {fmtAgo(r.createdAt, now)}
                   </Text>
                   <View style={[s.row, { marginTop: 10, gap: 8 }]}>
                     <Pressable
@@ -184,7 +221,13 @@ export default function PingDetail() {
                   </View>
                 </Card>
               ))}
-              <Button title="Write a review" variant="outline" icon="create-outline" onPress={() => router.push(`/review/${ping.id}`)} />
+              {isMine ? (
+                <Body style={{ textAlign: 'center' }}>You can’t review your own ping.</Body>
+              ) : myReview ? (
+                <Body style={{ textAlign: 'center' }}>You’ve reviewed this place. Thanks!</Body>
+              ) : (
+                <Button title="Write a review" variant="outline" icon="create-outline" onPress={() => router.push(`/review/${ping.id}`)} />
+              )}
             </View>
           )}
 
@@ -194,22 +237,36 @@ export default function PingDetail() {
               <Text style={{ fontSize: 32, fontWeight: '700', color: C.dark, marginTop: 10 }}>{ping.going}</Text>
               <Body>{ping.going === 1 ? 'person is going' : 'people are going'}. New here? You’re in good company.</Body>
               <Spacer />
-              <Button title="Join conversation" icon="chatbubbles-outline" onPress={() => router.push(`/chat/${ping.id}`)} />
+              <Button title="Join the conversation" icon="chatbubbles-outline" onPress={() => router.push(`/chat/${ping.id}`)} />
             </View>
           )}
         </View>
       </ScrollView>
 
-      <View style={[s.row, { gap: 10, paddingHorizontal: 24, paddingTop: 10, paddingBottom: 26, borderTopWidth: 1, borderTopColor: C.line, backgroundColor: C.bg }]}>
+      <Footer style={[s.row, { gap: 10 }]}>
         <Button
-          title={isGoing ? '✓  You’re going' : 'I’m going'}
+          title={isGoing ? '✓  You’re going' : ping.kind === 'place' ? 'I’m heading there' : 'I’m going'}
           variant={isGoing ? 'outline' : 'primary'}
           style={{ flex: 1 }}
           disabled={!ping.live}
           onPress={() => toggleGoing(ping.id)}
         />
         <Button title="Share" icon="share-outline" variant="outline" style={{ width: 120 }} onPress={share} />
-      </View>
+      </Footer>
+
+      {menu ? (
+        <SafetyMenu
+          visible={!!menu}
+          onClose={() => setMenu(null)}
+          target={menu.target}
+          id={menu.id}
+          authorId={menu.authorId}
+          authorName={menu.authorName}
+          onDone={() => {
+            if (menu.target === 'ping') router.replace('/(tabs)');
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

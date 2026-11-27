@@ -1,13 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../../src/components/Text';
 import { Body, Button, Card, H1, Photo, Screen, Spacer } from '../../src/components/ui';
 import { useApp } from '../../src/store';
 import { C } from '../../src/theme';
 import { fmtLeft, fmtWhen } from '../../src/time';
 
 export default function Published() {
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getPing, now } = useApp();
   const ping = getPing(id);

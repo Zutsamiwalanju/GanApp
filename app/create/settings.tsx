@@ -1,6 +1,7 @@
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
+import { Text } from '../../src/components/Text';
 import { BackButton, Badge, Body, Button, Card, ChipGroup, Eyebrow, H1, Label, Photo, Screen, Spacer, Toggle } from '../../src/components/ui';
 import { radiusLabel } from '../../src/geo';
 import { useApp } from '../../src/store';
@@ -13,8 +14,10 @@ const PROMOTER_HOURS = [6, 12, 24, 168];
 const PROMOTER_RADII = [1000, 3000, 5000];
 
 export default function Settings() {
+  const router = useRouter();
   const { draft, updateDraft, publish, profile, now } = useApp();
   const [busy, setBusy] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const promoter = profile.role === 'promoter';
   const hours = promoter ? PROMOTER_HOURS : EXPLORER_HOURS;
   const radii = promoter ? PROMOTER_RADII : EXPLORER_RADII;
@@ -37,7 +40,7 @@ export default function Settings() {
   };
 
   return (
-    <Screen footer={<Button title={promoter ? 'Publish promoted ping' : 'Publish pin'} onPress={go} loading={busy} />}>
+    <Screen footer={<Button title={promoter ? 'Publish promoted ping' : 'Publish pin'} onPress={go} loading={busy} disabled={!agreed} />}>
       <BackButton />
       <Spacer h={20} />
       <Eyebrow>ALMOST THERE</Eyebrow>
@@ -46,16 +49,11 @@ export default function Settings() {
 
       <Label>Ping lasts</Label>
       <ChipGroup options={hours} value={durationH} onChange={(h) => updateDraft({ durationH: h })} label={hoursLabel} />
-      <Text style={{ color: C.muted, fontSize: 12, marginTop: 8, marginBottom: 20 }}>
-        Disappears automatically {fmtUntil(endsAt, now).replace('Until', 'at')}
-        {durationH === 168 ? ' (runs for a week)' : ''}.
-      </Text>
+      <Text style={{ color: C.muted, fontSize: 12, marginTop: 8, marginBottom: 20 }}>Disappears automatically {fmtUntil(endsAt, now).replace('Until', 'at')}.</Text>
 
       <Label>{promoter ? 'Reach' : 'Who can see it'}</Label>
       <ChipGroup options={radii} value={radiusM} onChange={(r) => updateDraft({ radiusM: r })} label={radiusLabel} />
-      <Text style={{ color: C.muted, fontSize: 12, marginTop: 8, marginBottom: 20 }}>
-        Only people within {radiusLabel(radiusM)} see it on their map.
-      </Text>
+      <Text style={{ color: C.muted, fontSize: 12, marginTop: 8, marginBottom: 20 }}>Only people within {radiusLabel(radiusM)} see it on their map.</Text>
 
       {promoter ? (
         <>
@@ -75,14 +73,38 @@ export default function Settings() {
             {draft.placeName} · {draft.category} · {fmtTime(draft.startsAt)}
           </Text>
           <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-            <Badge text={`⏱ Disappears in ${hoursLabel(durationH) === 'Weekly' ? '7d' : `${durationH}h`}`} />
+            <Badge text={`⏱ Disappears in ${durationH === 168 ? '7 days' : `${durationH}h`}`} />
             <Badge text={`Within ${radiusLabel(radiusM)}`} tone="grey" />
             {promoter && draft.isPromoted ? <Badge text="PROMOTED" tone="gold" /> : null}
           </View>
         </View>
       </Card>
       <Spacer />
-      <Body>✓  Live photo taken at the spot just now. Pings from the gallery aren’t allowed, so explorers know it’s real.</Body>
+      <Pressable onPress={() => setAgreed(!agreed)} style={{ flexDirection: 'row', alignItems: 'flex-start' }} accessibilityRole="checkbox" accessibilityState={{ checked: agreed }}>
+        <View
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 6,
+            borderWidth: 2,
+            borderColor: agreed ? C.primary : C.line,
+            backgroundColor: agreed ? C.primary : C.white,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 10,
+            marginTop: 1,
+          }}
+        >
+          {agreed ? <Text style={{ color: C.white, fontSize: 13, fontWeight: '700' }}>✓</Text> : null}
+        </View>
+        <Body style={{ flex: 1 }}>
+          This is real and happening, and my photo follows the{' '}
+          <Text style={{ color: C.primary, fontWeight: '600' }} onPress={() => router.push('/privacy')}>
+            community rules
+          </Text>{' '}
+          (no close-ups of strangers).
+        </Body>
+      </Pressable>
     </Screen>
   );
 }

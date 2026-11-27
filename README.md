@@ -7,76 +7,93 @@ IE103-2 Technopreneurship · GRP1-AC2 (GANAPP)
 
 ---
 
-## What works
+## Run it on your phone
 
-| Area | Features |
-|---|---|
-| Onboarding | 3 intro slides, choose Explorer or Promoter, interests, location (or Makati sample city). No sign-up: each phone gets an anonymous account |
-| Explore | Live pings that reach you, nearest first, with filters (Happening now, Today, Free, Near me), recommendations from your interests, pull to refresh |
-| Map | Real map with colored pins, 500 m / 1 km / 5 km radius, ping card with walking directions (Google Maps) and Save |
-| Pin | **Live camera only** (no gallery), photo stamped with where it was taken, real text fields, category, start/end times, price, duration and vicinity |
-| Ping page | Countdown, About, Reviews (upvote "Helpful", kept-up-by-votes tag), Who's going, I'm going, Share, Save |
-| Connect | Event chat circle for every live event |
-| Promoter | Dashboard with reach/directions/going, create promoted ping (6 hrs / 12 hrs / 24 hrs / Weekly, 1 / 3 / 5 km, Promoted label), live insights, **Extend ping +6 hrs** (end time updates instantly), remove ping |
-| Also | Saved places, Notifications (live pings near you), Search, Profile (name, role, location, interests) |
+You need a laptop with **Node.js 22.13 or newer** (nodejs.org) and a phone with **Expo Go** (Play Store / App Store). This project uses **Expo SDK 58**, the same version as the current Expo Go.
 
-All times are shown in **12-hour format** (e.g. `Today, 6:00 PM – 10:00 PM`, `Until Tomorrow, 4:00 AM`) and are computed from the data, not typed in.
-
-## Tech
-
-- **App:** React Native + Expo (expo-router), TypeScript
-- **Backend:** Supabase: Postgres with row level security, anonymous auth, storage bucket `ping-photos`
-- **Maps:** react-native-maps · **Camera:** expo-camera · **Location:** expo-location
-
+**Windows PowerShell (first time only):**
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
-app/                 screens (file = route)
-  (tabs)/            Explore, Map, Pin, Connect
-  create/            camera → details → settings → published
-  promoter/          dashboard and live ping insights
-  ping/[id]          event/place page
-src/
-  api.ts             every Supabase call
-  store.tsx          app state (profile, location, pings, saves…)
-  time.ts            12-hour time formatting and countdowns
-  geo.ts             distance, radius labels, directions links
-  components/ui.tsx  buttons, chips, cards, badges (Figma styles)
-supabase/schema.sql  database tables, rules and functions
-```
-
-## Run it on your phone (first time)
-
-You need: a laptop with **Node.js 20+** (nodejs.org) and an Android or iPhone with **Expo Go** (Play Store / App Store).
 
 ```bash
-git clone https://github.com/<your-username>/GanApp.git
+git clone https://github.com/Zutsamiwalanju/GanApp.git
 cd GanApp
 npm install
-npx expo install expo@latest     # match the Expo version your Expo Go app supports
-npx expo install --fix           # align all Expo packages to that version
 npx expo start
 ```
 
 Scan the QR code with Expo Go (Android) or the Camera app (iPhone). Your phone and laptop must be on the same Wi-Fi. If they aren't, use `npx expo start --tunnel`.
 
-### One-time Supabase setting (required)
+If you already cloned it before: `git pull`, then `npm install` again.
 
-In the Supabase dashboard: **Authentication → Sign In / Providers → turn on "Allow anonymous sign-ins"**, then save. Without this the app shows "Can't reach GanApp".
+### One-time Supabase setting
 
-The database tables, security rules, photo bucket and sample Makati data are already set up in the project. `supabase/schema.sql` is a copy for reference.
+In the Supabase dashboard, go to **Authentication → Sign In / Providers**, turn on **Allow anonymous sign-ins**, then save.
 
-### Keys
+## What's in the app
 
-`.env` holds the Supabase URL and **publishable** key. Both are meant to be public and are safe in the app.
-**Never** put the `service_role` key or database password in this repo, and never paste them in chat.
+| Area | Features |
+|---|---|
+| Onboarding | Illustrated intro, Explorer or Promoter, interests, location or a sample area (Makati or Intramuros). No sign-up needed. |
+| Explore | Pings that reach you, with "happening now" first. Filters: Happening now, Today, Free, Near me. Recommendations from your interests. Area switcher. |
+| Map | Category-colored pins, 500 m / 1 km / 5 km radius, recenter, walking directions, Save. |
+| Pin | **Live camera only** (no gallery). The ping is placed where the photo was taken. Real text fields, category, day + time picker, price, duration and reach. Community-rules check before publishing. |
+| Ping page | Event time or opening hours (open/closed), place reviews with ▲ Helpful, Who's going, I'm going, Share, Save, Report / Block. Owners can Edit. |
+| Connect | A chat circle for every event; long-press a message to report it or block someone. |
+| Promoter | Dashboard, private **practice ping**, promoted pings (6 hrs / 12 hrs / 24 hrs / 7 days, 1 / 3 / 5 km), insights, **Extend ping +6 hrs**, Edit, Remove (also deletes the photo). |
+| Also | Saved, Notifications, Search, Profile, Privacy & community rules. |
+
+All times use the **12-hour format** and are worked out from the data. Sample events follow the real Manila clock, for example "Sunset Sessions, 5:00 PM – 10:00 PM".
+
+### Trust & safety (enforced in the database, not just the app)
+- One review per person per place. You can't review your own ping or upvote your own review.
+- Reviews belong to the **place**, so a venue keeps its reputation across many pings.
+- Report anything; it's hidden for you right away and **for everyone after 3 reports**.
+- Block people to hide everything they post.
+- Only Promoter accounts can mark a ping as Promoted. Only admins can set "verified".
+- Stats are honest: each person counts once and owners' own views don't count.
+
+## Tech
+
+- **App:** React Native 0.88 + Expo SDK 58 (expo-router), TypeScript, Inter font
+- **Backend:** Supabase. Postgres with row level security, anonymous auth, `ping-photos` storage
+- **Maps:** react-native-maps · **Camera:** expo-camera · **Location:** expo-location · **Images:** expo-image
+
+```
+app/                    screens (file = route)
+  (tabs)/               Explore, Map, Pin, Connect
+  create/               camera → details → settings → published
+  ping/[id], ping/edit  event page and edit
+  promoter/             dashboard and live insights
+src/
+  api.ts                every Supabase call
+  store.tsx             app state (profile, location, pings, saves, blocks…)
+  time.ts               12-hour times, "happening now", open/closed
+  assets.ts             bundled artwork, icons and fonts
+  components/           UI kit, Inter Text, Report/Block menu, day/time picker
+assets/                 app icon, splash, illustrations (art/), category icons (cat/), fonts
+supabase/schema.sql     original tables (v1). v2 changes are in the Supabase migration history:
+                        v2_trust_safety_and_places, v2_demo_data
+```
+
+## Keys
+
+`.env` holds the Supabase URL and **publishable** key. Both are meant to be public.
+**Never** put the `service_role` key or the database password in this repo, and never paste them in chat.
 
 ## Demo tips
 
-- Choose **Explore sample city** at the location step to see the Makati demo pings (Sunset Sessions, Gallery After Hours, The Mill…). They refresh automatically so they always look live.
-- For the Promoter demo, choose Promoter, take a live photo, publish, then tap **Extend ping +6 hrs** and watch "Until…" and "Ends in…" update.
+- At Mapúa, pick **Intramuros** (or use your location there): Kalye Food Crawl, Plaza Roma Acoustic Jam, Muralla Study Café and more.
+- For the Promoter demo, choose Promoter, tap **Try a practice ping**, then **Extend ping +6 hrs** and watch "Ping visible until…" change.
 
-## Known limits / next steps
+## Not done yet (needs a store build or more time)
 
-- Push notifications (the Notifications screen currently lists live pings near you)
-- Promoter verification badge and a Report button for moderation
-- Dark mode, weekly repeating pings, real-time chat (it currently refreshes every 5 seconds)
-- Play Store build: needs a Google Maps API key in `app.json` for Android builds outside Expo Go
+- Push notifications (Expo Go can't receive them; the Notifications screen lists nearby pings instead)
+- Saving your account with an email so you can move to a new phone
+- Verified business badges and payments for promoted pings
+- Dark mode
+- Real-time chat (it currently refreshes every 5 seconds)
+- Android Play Store build: needs a Google Maps API key in `app.json`
+
+Artwork and icon were drawn for GanApp. Inter font © The Inter Project Authors, SIL Open Font License (see `assets/fonts/OFL.txt`).

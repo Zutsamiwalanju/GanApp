@@ -5,6 +5,7 @@ export type Profile = {
   displayName: string;
   role: Role;
   interests: string[];
+  verified: boolean;
 };
 
 export type Ping = {
@@ -16,6 +17,7 @@ export type Ping = {
   description: string;
   placeName: string;
   address: string;
+  placeKey: string | null;
   lat: number;
   lng: number;
   kind: 'event' | 'place';
@@ -24,6 +26,8 @@ export type Ping = {
   pingEndsAt: string;
   radiusM: number;
   isPromoted: boolean;
+  isPrivate: boolean;
+  isDemo: boolean;
   priceLabel: string;
   photoUrl: string | null;
   views: number;
@@ -54,13 +58,15 @@ export type Message = {
   createdAt: string;
 };
 
+export type ReportTarget = 'ping' | 'review' | 'message';
+export type ReportReason = 'spam' | 'fake' | 'inappropriate' | 'unsafe' | 'other';
+
 /** What the user is filling in while making a new ping. */
 export type Draft = {
   photoUri: string | null;
   photoBase64: string | null;
   lat: number | null;
   lng: number | null;
-  locationVerified: boolean;
   title: string;
   category: string;
   placeName: string;

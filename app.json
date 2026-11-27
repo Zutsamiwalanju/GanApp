@@ -3,8 +3,9 @@
     "name": "GanApp",
     "slug": "ganapp",
     "scheme": "ganapp",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "backgroundColor": "#F9FBFA",
     "ios": {
@@ -13,10 +14,25 @@
     },
     "android": {
       "package": "com.ganapp.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundImage": "./assets/adaptive-bg.png",
+        "monochromeImage": "./assets/adaptive-mono.png",
+        "backgroundColor": "#087F70"
+      },
       "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#087F70"
+        }
+      ],
       [
         "expo-camera",
         {
@@ -30,9 +46,6 @@
           "locationWhenInUsePermission": "GanApp uses your location to show what is happening near you and to place your pings on the map."
         }
       ]
-    ],
-    "experiments": {
-      "typedRoutes": false
-    }
+    ]
   }
 }

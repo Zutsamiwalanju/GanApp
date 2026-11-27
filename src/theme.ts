@@ -15,21 +15,19 @@ export const C = {
 
 export const R = { card: 20, field: 14, pill: 999 };
 
-export const CATEGORIES = [
-  'Food', 'Music', 'Art', 'Sports', 'Nightlife', 'Nature', 'Culture', 'Tech', 'Wellness',
-] as const;
+export const CATEGORIES = ['Food', 'Music', 'Art', 'Sports', 'Nightlife', 'Nature', 'Culture', 'Tech', 'Wellness'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
-export const CAT: Record<Category, { emoji: string; color: string }> = {
-  Food: { emoji: '🍜', color: '#F56857' },
-  Music: { emoji: '🎧', color: '#087F70' },
-  Art: { emoji: '🎨', color: '#7C5CFA' },
-  Sports: { emoji: '🏀', color: '#E8902E' },
-  Nightlife: { emoji: '🌙', color: '#3B3B98' },
-  Nature: { emoji: '🌿', color: '#2E9E5B' },
-  Culture: { emoji: '🏛️', color: '#B5651D' },
-  Tech: { emoji: '💡', color: '#2F80ED' },
-  Wellness: { emoji: '🧘', color: '#D16BA5' },
+export const CAT_COLOR: Record<Category, string> = {
+  Food: '#F56857',
+  Music: '#087F70',
+  Art: '#7C5CFA',
+  Sports: '#E8902E',
+  Nightlife: '#3B3B98',
+  Nature: '#2E9E5B',
+  Culture: '#B5651D',
+  Tech: '#2F80ED',
+  Wellness: '#D16BA5',
 };
 
-export const catMeta = (c: string) => CAT[(c as Category)] ?? { emoji: '📍', color: C.primary };
+export const catMeta = (c: string) => ({ color: CAT_COLOR[c as Category] ?? C.primary });
